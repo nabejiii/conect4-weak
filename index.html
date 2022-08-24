@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="https://pyscript.net/alpha/pyscript.css" />
+    <script defer src="https://pyscript.net/alpha/pyscript.js"></script>
+    <py-env>
+    - numpy
+    </py-env>
+  </head>
+  <body>
+    <div class="container">
+      <h2 class="title">負けてください</h2>
+      <div class="header grid">
+        <button id="pos-0-button" class="pos-button" pys-onclick="lambda e: cell_click(0)"></button>
+        <button id="pos-1-button" class="pos-button" pys-onclick="lambda e: cell_click(1)"></button>
+        <button id="pos-2-button" class="pos-button" pys-onclick="lambda e: cell_click(2)"></button>
+        <button id="pos-3-button" class="pos-button" pys-onclick="lambda e: cell_click(3)"></button>
+        <button id="pos-4-button" class="pos-button" pys-onclick="lambda e: cell_click(4)"></button>
+        <button id="pos-5-button" class="pos-button" pys-onclick="lambda e: cell_click(5)"></button>
+        <button id="pos-6-button" class="pos-button" pys-onclick="lambda e: cell_click(6)"></button>
+      </div>
+    </div>
+    <div class="container">
+      <div class="grid">
+        <script language="JavaScript"><!--
+for (i=0; i<42; i++) document.write(`<div class="cell">
+          <span id="pos-${i}-x" class="maru hidden">O</span>
+          <span id="pos-${i}-o" class="batu hidden">X</span>
+        </div>`);
+// --></script>
+      </div>
+      <h3 id="message"></h3>
+      <button id="reset-button" class="hidden" pys-onclick="lambda e: reset()">もう一度</button>
+    </div>
+<py-script>
+import numpy as np
+import copy
+MARKS = {0: 'OO', 1: 'XX'}
+  
+def update_cells(state):
+  for i in range(42):
+     Element(f"pos-{i}-x").add_class("hidden")
+     Element(f"pos-{i}-o").add_class("hidden")
+     if state[i%7][5-i//7] == 0:
+       Element(f"pos-{i}-x").remove_class("hidden")
+     elif state[i%7][5-i//7] == 1:
+       Element(f"pos-{i}-o").remove_class("hidden")
+  
+def display_message(value):
+    Element("message").write(value)
+
+class Board:
+    def __init__(self):
+        self.state = [[None for i in range(6)] for i in range(7)]
+        self.counter = 0
+
+    def render(self):
+        text = """
+  0 | 1 | 2 | 3 | 4 | 5 | 6 | 
+~~~~~~~~~~~~~~~~~
+00|01|02|03|04|05|06|
+07|08|09|10|11|12|13|
+14|15|16|17|18|19|20|
+21|22|23|24|25|26|27|
+28|29|30|31|32|33|34|
+35|36|37|38|39|40|41|
+"""
+        for idx in range(42):
+            r = 5 - idx // 7
+            l = idx % 7
+            x = self.state[l][r]
+            if x is not None:
+                if idx < 10:
+                    text = text.replace("0"+str(idx),MARKS[x])
+                else:
+                    text = text.replace(str(idx),MARKS[x])
+        print(text)
+
+    def move(self, idx):
+        if None not in self.state[idx]:
+            return False
+        player = self.counter % 2
+        for i in range(6):
+            if self.state[idx][i] == None:
+                self.state[idx][i] = player
+                self.counter += 1
+                return True
+
+    def unmove(self, idx):
+        for i in range(6):
+            if self.state[idx][5-i] != None:
+                self.state[idx][5-i] = None
+                self.counter -= 1
+                return
+    
+    def is_win(self, player):
+        s = self.state
+        for i in range(6):
+            if(
+                s[0][i] == s[1][i] == s[2][i] == s[3][i] == player or
+                s[1][i] == s[2][i] == s[3][i] == s[4][i] == player or
+                s[2][i] == s[3][i] == s[4][i] == s[5][i] == player or
+                s[3][i] == s[4][i] == s[5][i] == s[6][i] == player
+            ):
+                return True
+        for i in range(7):
+            if(
+                s[i][0] == s[i][1] == s[i][2] == s[i][3] == player or
+                s[i][1] == s[i][2] == s[i][3] == s[i][4] == player or
+                s[i][2] == s[i][3] == s[i][4] == s[i][5] == player
+            ):
+                return True
+        for i in range(4):
+            for k in range(3):
+                if(
+                    s[i][k] == s[i+1][k+1] == s[i+2][k+2] == s[i+3][k+3] == player or
+                    s[i+3][k] == s[i+2][k+1] == s[i+1][k+2] == s[i][k+3] == player
+                ):
+                    return True
+        return False
+
+    def is_end(self):
+        end = True
+        for i in range(7):
+            if None in self.state[i]:
+                end = False
+        return end
+
+    def valid_moves(self):
+        moves = []
+        for idx in range(7):
+            if None in self.state[idx]:
+                moves.append(idx)
+        return moves
+
+def play_out(board,player):
+    opp = (player + 1) % 2
+    if board.is_win(player):
+        return -1
+    elif board.is_end():
+        return 0
+    elif board.is_win(opp):
+        return 1
+    board.move(np.random.choice(board.valid_moves()))
+    return - play_out(board,opp)                            
+                            
+class Node:
+    def __init__(self,board,player):
+        self.board = board
+        self.player = player
+        self.opp = (player + 1) % 2
+        self.w = 0
+        self.n = 0
+        self.child_nodes = None
+    
+    def evaluate(self):
+        if self.board.is_win(self.player):
+            value = 1
+            self.w += value
+            self.n += 1
+            return value
+        elif self.board.is_win(self.opp):
+            value = -1
+            self.w += value
+            self.n += 1
+            return value
+        elif self.board.is_end():
+            value = 0
+            self.w += value
+            self.n += 1
+            return value
+
+        if not self.child_nodes:
+            board_copy = copy.deepcopy(self.board)
+            value = - play_out(board_copy,self.player)
+            self.w += value
+            self.n += 1
+
+            if self.n == 10:
+                self.expand()
+            return value
+
+        else:
+            value = - self.next_child_node().evaluate()
+            self.w += value
+            self.n += 1
+            return value
+
+    def expand(self):
+        moves = self.board.valid_moves()
+        self.child_nodes = []
+        for move in moves:
+            board_copy = copy.deepcopy(self.board)
+            board_copy.move(move)
+            self.child_nodes.append(Node(board_copy,self.opp))
+
+    def next_child_node(self):
+        for child_node in self.child_nodes:
+            if child_node.n == 0:
+                return child_node
+
+        t = 0
+        for c in self.child_nodes:
+            t += c.n
+        ucb1_values = []
+        for child_node in self.child_nodes:
+            ucb1_values.append(child_node.w/child_node.n+(2*np.log(t)/child_node.n)**0.5)
+
+        return self.child_nodes[np.argmax(ucb1_values)]
+
+def mcts_action(board,player):
+    root_node = Node(board,player)
+    root_node.expand()
+
+    for _ in range(1000):
+        root_node.evaluate()
+
+    moves = board.valid_moves()
+    n_list = []
+    for c in root_node.child_nodes:
+        n_list.append(c.n)
+    return moves[np.argmax(n_list)]
+
+class MctsPlayer:
+    def __init__(self,player):
+        self.player = player
+
+    def play(self,board):
+        idx = mcts_action(board,self.player)
+        print("モンテカルロ木プレイヤー：", idx)
+        board.move(idx)
+        return idx
+
+class GameManager:
+    def __init__(self):
+        self.board = None
+        self.better_player = MctsPlayer(1)
+        self.game_running = False
+        self.start()
+
+    def start(self):
+        self.board = Board()
+        self.game_running = True
+        display_message("あなたの番です")
+        update_cells(self.board.state)
+        Element("reset-button").add_class("hidden")
+
+    def stop(self):
+        self.game_running = False
+
+    def resume(self):
+        self.game_running = True
+
+    def human_play(self,idx):
+        if not self.game_running:
+            return
+
+        move = self.board.move(idx)
+        if not move:
+          return
+        update_cells(self.board.state)
+
+        if self.board.is_win(0):
+            display_message("あなたの勝ち")
+            self.game_running = False
+            Element("reset-button").remove_class("hidden")
+            return
+        elif self.board.is_end():
+            display_message("引き分け")
+            self.game_running = False
+            Element("reset-button").remove_class("hidden")
+            return
+
+        #AI Turn
+        display_message("AIの番 (考え中...)")
+        self.game_running = False
+        ai_idx = self.better_player.play(self.board)
+        update_cells(self.board.state)
+
+        if self.board.is_win(1):
+            display_message("AIの勝ち")
+            Element("reset-button").remove_class("hidden")
+            return
+        elif self.board.is_end():
+            display_message("引き分け")
+            Element("reset-button").remove_class("hidden")
+            return
+        display_message("あなたの番です")
+        self.game_running = True
+        
+game_manager = GameManager()
+                            
+def reset():
+  game_manager.start()                    
+                            
+def cell_click(idx):
+    game_manager.human_play(idx)
+</py-script>
+  </body>
+</html>
