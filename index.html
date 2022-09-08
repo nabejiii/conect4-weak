@@ -213,7 +213,7 @@ def mcts_action(board,player):
     root_node = Node(board,player)
     root_node.expand()
 
-    for _ in range(1000):
+    for _ in range(500):
         root_node.evaluate()
 
     moves = board.valid_moves()
@@ -257,6 +257,7 @@ class GameManager:
             return
 
         move = self.board.move(idx)
+        self.game_running = False
         if not move:
           return
         update_cells(self.board.state)
